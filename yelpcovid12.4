@@ -1,0 +1,270 @@
+-- drop schema if exists yelp_covid;
+create schema restaurant;
+use restaurant;
+
+create view closed_restaurant as
+select * 
+from restaurant
+where is_closed = 1;
+
+
+select count(*) from closed_restaurant; -- 79 total closed restaurants
+select count(*) from restaurant; -- 4353
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant; -- 1.81% of restaurants are closed (not as bad as we thought)
+
+-- Average review rating for restaurants that closed was lower than the ones open
+
+select avg(star_rating ) as open_rating
+from restaurant
+where num_reviews >= 100 and is_closed != 1; -- 3.728
+
+select avg(star_rating) as closed_rating
+from closed_restaurant
+where num_reviews >= 100; -- 3.595
+
+-- determine type of cuisine in closed
+select cuisine, count(cuisine)
+from closed_restaurant
+group by cuisine;
+
+-- 27 total "american" cuisine restaurants closed 
+select count(*)
+from closed_restaurant
+where cuisine like '%, american%' or cuisine like 'american%'; -- 27
+
+select count(*)
+from restaurant
+where cuisine like '%, american%' or cuisine like 'american%'; -- 544
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%, american%' or cuisine like 'american%'; -- 4.96
+
+-- italian cuisine
+select count(*)
+from closed_restaurant
+where cuisine like '%, italian%' or cuisine like 'italian%'; -- 8
+
+select count(*)
+from restaurant
+where cuisine like '%, italian%' or cuisine like 'italian%'; -- 263
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%, italian%' or cuisine like 'italian%'; -- 3.04
+
+-- breakfast
+select count(*)
+from closed_restaurant
+where cuisine like '%, breakfast%' or cuisine like 'breakfast%'; -- 14
+
+select count(*)
+from restaurant
+where cuisine like '%, breakfast%' or cuisine like 'breakfast%'; -- 301
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%, breakfast%' or cuisine like 'breakfast%'; -- 4.65
+
+-- bars (any bars, not just sports bars or dive bars)
+select count(*)
+from closed_restaurant
+where cuisine like '%, bars%' or cuisine like '% bars%' or cuisine like 'bars%'; -- 29
+
+select count(*)
+from restaurant
+where cuisine like '%, bars%' or cuisine like '% bars%' or cuisine like 'bars%'; -- 750
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%, bars%' or cuisine like '% bars%' or cuisine like 'bars%'; -- 3.87
+
+-- mexican cuisine
+select count(*)
+from closed_restaurant
+where cuisine like '%, mexican%' or cuisine like 'mexican%'; -- 1
+
+select count(*)
+from restaurant
+where cuisine like '%, mexican%' or cuisine like 'mexican%'; -- 171
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%, mexican%' or cuisine like 'mexican%'; -- .58
+
+-- food trucks
+select count(*)
+from closed_restaurant
+where cuisine like '%food trucks%'; -- 0
+
+select count(*)
+from restaurant
+where cuisine like '%food trucks%'; -- 62
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%food trucks%'; -- 0
+
+-- coffee and tea
+select count(*)
+from closed_restaurant
+where cuisine like '%coffee & tea%'; -- 8
+
+select count(*)
+from restaurant
+where cuisine like '%coffee & tea%'; -- 632
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%coffee & tea%'; -- 1.27
+
+-- japanese
+select count(*)
+from closed_restaurant
+where cuisine like '%japanese%'; -- 4
+
+select count(*)
+from restaurant
+where cuisine like '%japanese%'; -- 108
+
+select round((sum(is_closed) / count(*)) * 100, 2)
+from restaurant
+where cuisine like '%japanese%'; -- 3.70
+
+-- Zipcodes of closed restaurants 
+
+select count(*) as count_closed_downtown
+from downtown_property dp
+join closed_restaurant r
+on r.zip_code = dp.zip_code;
+
+select count(*) as count_closed_nondowntown
+from non_downtown_property ndp
+join closed_restaurant r
+on r.zip_code = ndp.zip_code; 
+
+select count(zip_code) as count_closed, zip_code
+from closed_restaurant
+group by zip_code
+order by count(zip_code) desc;
+
+-- How many closed restaurants are in the same zip codes as colleges/universities 
+
+select * from closed_restaurant;
+select * from zip_code;
+
+select count(*) as closed_count, cu.zipcode as college_zip_code, cu.name as college_name
+from colleges_and_universities cu
+join zip_code z
+on z.zipcode = cu.zipcode
+join restaurant r
+on z.zipcode = r.zip_code
+where r.zip_code = cu.zipcode and r.is_closed = 1
+group by college_zip_code, college_name
+order by closed_count desc; 
+
+-- average rating per cuisine 
+
+select cuisine, avg(star_rating ) as open_rating
+from restaurant
+where num_reviews >= 100 
+group by cuisine
+order by open_rating desc; 
+
+
+-- shows the difference in property costs, and therefore, the rent costs of different regions in boston
+create view downtown_property as
+select zip_code, round(avg(value)) as 'average_property_value'
+from property_assessment
+where zip_code in ('02108', '02109', '02110', '02210', '02114', '02113', '02116', '02118')
+group by zip_code
+order by average_property_value desc;
+
+create view non_downtown_property as
+select zip_code, round(avg(value)) as 'average_property_value'
+from property_assessment
+where zip_code in ('02115', '02129', '02128')
+group by zip_code
+order by average_property_value desc;
+
+select round(avg(average_property_value)) as 'average_value_downtown'
+from downtown_property;
+
+select round(avg(average_property_value)) as 'average_value_nondowntown'
+from non_downtown_property;
+
+
+-- which zip code had the highest number of restaurants closed (number of closed restauraunts per zip code)
+select * from restaurant;
+select * from zip_code;
+
+select zip_code, count(zip_code) as 'num_closed'
+from closed_restaurant
+group by zip_code
+order by num_closed desc
+limit 3;
+
+-- average property value for zipcodes with highest closed restaurants rate (2nd and 3rd highest)
+-- 8 restaurants closed
+select round(avg(average_property_value)) as 'average_value'
+from downtown_property;
+-- 7 restaurants closed
+select round(avg(average_property_value)) as 'average_value'
+from non_downtown_property;
+
+select * from colleges_and_universities;
+select * from closed_business_data_reviews;
+select * from restaurant;
+select * from zip_code;
+select * from property_assessment;
+
+-- restaurants that closed that did only delivery 
+select closed/count(*) as percentage_delivery
+from closed_delivery cd
+join closed_restaurant cr
+on cr.transactions = cd.transactions
+group by cd.transactions;
+
+
+create view closed_delivery as 
+select count(*) as closed, transactions
+from closed_restaurant
+where transactions like '%delivery' 
+and transactions not like '%delivery,pickup'
+and transactions not like '%pickup, delivery'
+group by transactions;
+
+
+-- restaurants that stayed open that only did delivery
+
+select openr/count(*) as percentage_delivery
+from open_delivery od
+join restaurant r
+on r.transactions = od.transactions
+group by od.transactions;
+
+drop view open_delivery;
+
+create view open_delivery as 
+select count(*) as openr, transactions
+from restaurant
+where transactions like '%delivery' 
+and transactions not like '%delivery,pickup'
+and transactions not like '%pickup, delivery'
+and transactions not like '%pickup, restaurant_reservation, delivery'
+and transactions not like '%restaurant_reservation, delivery'
+and is_closed != 1
+group by transactions;
+
+
+-- restaurants that stayed open but did not offer delivery/pickup
+
+update restaurant 
+set transactions = null 
+where transactions = '';
+
+select count(*) as total_restaurant
+from restaurant
+where transactions is null;
